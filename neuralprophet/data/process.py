@@ -3,6 +3,7 @@ from typing import List, Optional
 
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 
 from neuralprophet import df_utils, time_dataset
 from neuralprophet.configure import (
@@ -130,11 +131,15 @@ def _reshape_raw_predictions_to_forecst_df(
     for comp in components:
         if comp not in lagged_components:
             for j in range(len(quantiles)):
-                forecast_0 = components[comp][0, :, j]
-                forecast_rest = components[comp][1:, n_forecasts - 1, j]
-                yhat = np.pad(
-                    np.concatenate((forecast_0, forecast_rest)), (max_lags, 0), mode="constant", constant_values=np.NaN
-                )
+                forecast = components[comp][:, forecast_lag - 1, j]
+                pad_before = max_lags + forecast_lag - 1
+                pad_after = n_forecasts - forecast_lag
+                yhat = np.pad(forecast, (pad_before, pad_after), mode="constant", constant_values=np.NaN)
+                # forecast_0 = components[comp][0, :, j]
+                # forecast_rest = components[comp][1:, n_forecasts - 1, j]
+                # yhat = np.pad(
+                #     np.concatenate((forecast_0, forecast_rest)), (max_lags, 0), mode="constant", constant_values=np.NaN
+                # )
                 if prediction_frequency is not None:
                     date_list = []
                     for key, value in prediction_frequency.items():
@@ -164,10 +169,16 @@ def _reshape_raw_predictions_to_forecst_df(
                     )
                     df_comp, _ = df_utils.add_missing_dates_nan(df=df_comp, freq=freq)
                     yhat = pd.merge(df_forecast.filter(["ds", "ID"]), df_comp, on="ds", how="left")["yhat"].values
-                if j == 0:  # temporary condition to add only the median component
-                    # add yhat into dataframe, using df_forecast indexing
-                    yhat_df = pd.Series(yhat, name=comp).set_axis(df_forecast.index)
-                    df_forecast = pd.concat([df_forecast, yhat_df], axis=1, ignore_index=False)
+                if j == 0:
+                    name = comp
+                else:
+                    name = f"{comp} {round(quantiles[j] * 100, 1)}%"
+                # if j == 0:  # temporary condition to add only the median component
+                #     # add yhat into dataframe, using df_forecast indexing
+                yhat_df = pd.Series(yhat, name=name).set_axis(df_forecast.index)
+                df_forecast = pd.concat([df_forecast, yhat_df], axis=1, ignore_index=False)
+            z_score = norm.ppf(quantiles[2])
+            df_forecast[f"{comp} SD"] = df_forecast[f"{comp} {round(quantiles[2] * 100, 1)}%"] - df_forecast[f"{comp} {round(quantiles[1] * 100, 1)}%"] / z_score * 2
     return df_forecast
 
 

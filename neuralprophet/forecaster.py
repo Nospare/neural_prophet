@@ -2,7 +2,7 @@ import logging
 import os
 import time
 from collections import OrderedDict
-from typing import Callable, List, Optional, Tuple, Type, Union
+from typing import Callable, List, Literal, Optional, Tuple, Type, Union
 
 import matplotlib
 import numpy as np
@@ -643,6 +643,7 @@ class NeuralProphet:
         regularization: Optional[float] = None,
         normalize: Union[str, bool] = "auto",
         mode: str = "additive",
+        constraint: Literal["positive", "negative"]= None
     ):
         """Add a regressor as lagged covariate with order 1 (scalar) or as known in advance (also scalar).
 
@@ -687,7 +688,7 @@ class NeuralProphet:
         if self.config_regressors.regressors is None:
             self.config_regressors.regressors = OrderedDict()
         self.config_regressors.regressors[name] = configure.Regressor(
-            reg_lambda=regularization, normalize=normalize, mode=mode
+            reg_lambda=regularization, normalize=normalize, mode=mode, constraint=constraint
         )
         return self
 
@@ -698,6 +699,7 @@ class NeuralProphet:
         upper_window: int = 0,
         regularization: Optional[float] = None,
         mode: str = "additive",
+        constraint= None
     ):
         """
         Add user specified events and their corresponding lower, upper windows and the
@@ -742,7 +744,7 @@ class NeuralProphet:
                 config_regressors=self.config_regressors,
             )
             self.config_events[event_name] = configure.Event(
-                lower_window=lower_window, upper_window=upper_window, reg_lambda=regularization, mode=mode
+                lower_window=lower_window, upper_window=upper_window, reg_lambda=regularization, mode=mode, constraint=constraint
             )
         return self
 
@@ -752,7 +754,7 @@ class NeuralProphet:
         lower_window: int = 0,
         upper_window: int = 0,
         regularization: Optional[float] = None,
-        mode: str = "additive",
+        mode: str = "additive"
     ):
         """
         Add a country into the NeuralProphet object to include country specific holidays
@@ -793,6 +795,7 @@ class NeuralProphet:
             upper_window=upper_window,
             reg_lambda=regularization,
             mode=mode,
+            
         )
         self.config_country_holidays.init_holidays()
         return self

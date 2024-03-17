@@ -2,7 +2,7 @@ import logging
 import math
 from collections import OrderedDict
 from functools import reduce
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 import numpy as np
 import pytorch_lightning as pl
@@ -239,17 +239,26 @@ class TimeNet(pl.LightningModule):
         if self.events_dims is not None:
             n_additive_event_params = 0
             n_multiplicative_event_params = 0
+            self.additive_constraint_mask = []
+            self.multiplicative_constraint_mask = []
             for event, configs in self.events_dims.items():
                 if configs["mode"] not in ["additive", "multiplicative"]:
                     log.error("Event Mode {} not implemented. Defaulting to 'additive'.".format(configs["mode"]))
                     self.events_dims[event]["mode"] = "additive"
                 if configs["mode"] == "additive":
                     n_additive_event_params += len(configs["event_indices"])
+                    self.additive_constraint_mask = self.set_constraint_mask(configs["constraint"], self.additive_constraint_mask)
                 elif configs["mode"] == "multiplicative":
                     if self.config_trend is None:
                         log.error("Multiplicative events require trend.")
                         raise ValueError
                     n_multiplicative_event_params += len(configs["event_indices"])
+                    self.multiplicative_constraint_mask = self.set_constraint_mask(configs["constraint"], self.multiplicative_constraint_mask)
+
+
+            self.additive_constraint_mask = torch.tensor(self.additive_constraint_mask).repeat(3, 1)
+            self.multiplicative_constraint_mask = torch.tensor(self.multiplicative_constraint_mask).repeat(3, 1)
+
             self.event_params = nn.ParameterDict(
                 {
                     # dimensions - [no. of quantiles, no. of additive events]
@@ -311,6 +320,17 @@ class TimeNet(pl.LightningModule):
         """sets property auto-regression weights for regularization. Update if AR is modelled differently"""
         # TODO: this is wrong for deep networks, use utils_torch.interprete_model
         return self.ar_net[0].weight
+    
+    @staticmethod
+    def set_constraint_mask(constraint_type: Literal["positive", "negative"], mask):
+        if constraint_type == "positive":
+            mask.append(1)
+        elif constraint_type == "negative":
+            mask.append(-1)
+        else:
+            mask.append(0)
+            
+        return mask
 
     def get_covar_weights(self, covar_input=None) -> torch.Tensor:
         """
@@ -586,12 +606,17 @@ class TimeNet(pl.LightningModule):
 
         if "events" in inputs:
             if "additive" in inputs["events"].keys():
+                with torch.no_grad():
+                    self.event_params["additive"][self.additive_constraint_mask == 1] = self.event_params["additive"][self.additive_constraint_mask == 1].clamp(min=0)
                 additive_events = self.scalar_features_effects(
                     inputs["events"]["additive"], self.event_params["additive"]
                 )
                 additive_components_nonstationary += additive_events
                 components["additive_events"] = additive_events
             if "multiplicative" in inputs["events"].keys():
+
+                with torch.no_grad():
+                    self.event_params["multiplicative"][self.multiplicative_constraint_mask == 1] = self.event_params["multiplicative"][self.multiplicative_constraint_mask == 1].clamp(min=0)
                 multiplicative_events = self.scalar_features_effects(
                     inputs["events"]["multiplicative"], self.event_params["multiplicative"]
                 )
@@ -723,13 +748,19 @@ class TimeNet(pl.LightningModule):
                 indices = configs["event_indices"]
                 if mode == "additive":
                     features = inputs["events"]["additive"][:, self.n_lags : inputs["time"].shape[1], :]
+                    # with torch.no_grad():
+                    #     self.event_params["additive"][self.additive_constraint_mask == 1] = self.event_params["additive"][self.additive_constraint_mask == 1].clamp(min=0)
                     params = self.event_params["additive"]
                 else:
                     features = inputs["events"]["multiplicative"][:, self.n_lags : inputs["time"].shape[1], :]
+                    # with torch.no_grad():
+                    #     self.event_params["multiplicative"][self.multiplicative_constraint_mask == 1] = self.event_params["multiplicative"][self.multiplicative_constraint_mask == 1].clamp(min=0)
                     params = self.event_params["multiplicative"]
+
                 components[f"event_{event}"] = self.scalar_features_effects(
                     features=features, params=params, indices=indices
                 )
+
         if self.config_regressors.regressors is not None and "regressors" in inputs:
             if "additive" in inputs["regressors"].keys():
                 components["future_regressors_additive"] = components_raw["additive_regressors"][

@@ -438,19 +438,20 @@ def config_events_to_model_dims(config_events: Optional[ConfigEvents], config_co
     if config_events is not None:
         for event, configs in config_events.items():
             mode = configs.mode
+            constraint = configs.constraint
             for offset in range(configs.lower_window, configs.upper_window + 1):
                 event_delim = create_event_names_for_offsets(event, offset)
                 if mode == "additive":
                     additive_events_dims = pd.concat(
                         [
                             additive_events_dims,
-                            pd.DataFrame([{"event": event, "event_delim": event_delim}]),
+                            pd.DataFrame([{"event": event, "constraint" :constraint, "event_delim": event_delim}]),
                         ],
                         ignore_index=True,
                     )
                 else:
                     multiplicative_events_dims = pd.concat(
-                        [multiplicative_events_dims, pd.DataFrame([{"event": event, "event_delim": event_delim}])],
+                        [multiplicative_events_dims, pd.DataFrame([{"event": event, "constraint" :constraint, "event_delim": event_delim}])],
                         ignore_index=True,
                     )
 
@@ -495,6 +496,7 @@ def config_events_to_model_dims(config_events: Optional[ConfigEvents], config_co
     for event, row in event_dims.groupby("event"):
         event_dims_dic[event] = {
             "mode": row["mode"].iloc[0],
+            "constraint": row["constraint"].iloc[0] if "constraint" in row else None,
             "event_delim": list(row["event_delim"]),
             "event_indices": list(row.index),
         }
