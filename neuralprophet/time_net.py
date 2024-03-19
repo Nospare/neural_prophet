@@ -748,13 +748,13 @@ class TimeNet(pl.LightningModule):
                 indices = configs["event_indices"]
                 if mode == "additive":
                     features = inputs["events"]["additive"][:, self.n_lags : inputs["time"].shape[1], :]
-                    # with torch.no_grad():
-                    #     self.event_params["additive"][self.additive_constraint_mask == 1] = self.event_params["additive"][self.additive_constraint_mask == 1].clamp(min=0)
+                    with torch.no_grad():
+                        self.event_params["additive"][self.additive_constraint_mask == 1] = self.event_params["additive"][self.additive_constraint_mask == 1].clamp(min=0)
                     params = self.event_params["additive"]
                 else:
                     features = inputs["events"]["multiplicative"][:, self.n_lags : inputs["time"].shape[1], :]
-                    # with torch.no_grad():
-                    #     self.event_params["multiplicative"][self.multiplicative_constraint_mask == 1] = self.event_params["multiplicative"][self.multiplicative_constraint_mask == 1].clamp(min=0)
+                    with torch.no_grad():
+                        self.event_params["multiplicative"][self.multiplicative_constraint_mask == 1] = self.event_params["multiplicative"][self.multiplicative_constraint_mask == 1].clamp(min=0)
                     params = self.event_params["multiplicative"]
 
                 components[f"event_{event}"] = self.scalar_features_effects(
