@@ -178,7 +178,7 @@ def _reshape_raw_predictions_to_forecst_df(
                 yhat_df = pd.Series(yhat, name=name).set_axis(df_forecast.index)
                 df_forecast = pd.concat([df_forecast, yhat_df], axis=1, ignore_index=False)
             z_score = norm.ppf(quantiles[2])
-            df_forecast[f"{comp} SD"] = df_forecast[f"{comp} {round(quantiles[2] * 100, 1)}%"] - df_forecast[f"{comp} {round(quantiles[1] * 100, 1)}%"] / z_score * 2
+            df_forecast[f"{comp} SD"] = np.abs(df_forecast[f"{comp} {round(quantiles[2] * 100, 1)}%"] - df_forecast[f"{comp} {round(quantiles[1] * 100, 1)}%"]) / z_score * 2
     return df_forecast
 
 
