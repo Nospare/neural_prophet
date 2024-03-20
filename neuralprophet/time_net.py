@@ -247,6 +247,10 @@ class TimeNet(pl.LightningModule):
                     self.events_dims[event]["mode"] = "additive"
                 if configs["mode"] == "additive":
                     n_additive_event_params += len(configs["event_indices"])
+                    # if configs["constraint"] == "positive":
+                    #     n_positive_additive_event_params += len(configs["event_indices"])
+                    # else:
+                    #     n_additive_event_params += len(configs["event_indices"])
                     self.additive_constraint_mask = self.set_constraint_mask(configs["constraint"], self.additive_constraint_mask)
                 elif configs["mode"] == "multiplicative":
                     if self.config_trend is None:
@@ -261,6 +265,7 @@ class TimeNet(pl.LightningModule):
 
             self.event_params = nn.ParameterDict(
                 {
+                    # "positive_additive": init_parameter(dims=[len(self.quantiles), n_positive_additive_event_params]),
                     # dimensions - [no. of quantiles, no. of additive events]
                     "additive": init_parameter(dims=[len(self.quantiles), n_additive_event_params]),
                     # dimensions - [no. of quantiles, no. of multiplicative events]
@@ -320,7 +325,7 @@ class TimeNet(pl.LightningModule):
         """sets property auto-regression weights for regularization. Update if AR is modelled differently"""
         # TODO: this is wrong for deep networks, use utils_torch.interprete_model
         return self.ar_net[0].weight
-    
+
     @staticmethod
     def set_constraint_mask(constraint_type: Literal["positive", "negative"], mask):
         if constraint_type == "positive":
@@ -329,7 +334,6 @@ class TimeNet(pl.LightningModule):
             mask.append(-1)
         else:
             mask.append(0)
-            
         return mask
 
     def get_covar_weights(self, covar_input=None) -> torch.Tensor:

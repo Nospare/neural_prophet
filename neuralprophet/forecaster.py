@@ -699,7 +699,7 @@ class NeuralProphet:
         upper_window: int = 0,
         regularization: Optional[float] = None,
         mode: str = "additive",
-        constraint= None
+        constraint = None
     ):
         """
         Add user specified events and their corresponding lower, upper windows and the
@@ -795,7 +795,6 @@ class NeuralProphet:
             upper_window=upper_window,
             reg_lambda=regularization,
             mode=mode,
-            
         )
         self.config_country_holidays.init_holidays()
         return self
