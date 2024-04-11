@@ -259,11 +259,12 @@ class TimeNet(pl.LightningModule):
                     n_multiplicative_event_params += len(configs["event_indices"])
                     self.multiplicative_constraint_mask = self.set_constraint_mask(configs["constraint"], self.multiplicative_constraint_mask)
 
-
-            self.additive_constraint_mask = torch.zeros(len(self.quantiles), len(self.additive_constraint_mask))
-            self.additive_constraint_mask[len(self.quantiles) // 2, :] = self.additive_constraint_mask
-            self.multiplicative_constraint_mask = torch.zeros(len(self.quantiles), len(self.multiplicative_constraint_mask))
-            self.multiplicative_constraint_mask[len(self.quantiles) // 2, :] = self.multiplicative_constraint_mask
+            expand_mask = torch.zeros(len(self.quantiles), len(self.additive_constraint_mask))
+            expand_mask[len(self.quantiles) // 2, :] = self.additive_constraint_mask
+            self.additive_constraint_mask = expand_mask
+            expand_mask = torch.zeros(len(self.quantiles), len(self.multiplicative_constraint_mask))
+            expand_mask[len(self.quantiles) // 2, :] = self.multiplicative_constraint_mask
+            self.multiplicative_constraint_mask = expand_mask
 
             self.event_params = nn.ParameterDict(
                 {
@@ -799,6 +800,7 @@ class TimeNet(pl.LightningModule):
         # Weigh newer samples more.
         loss = loss * self._get_time_based_sample_weight(t=inputs["time"][:, self.n_lags :])
         loss = loss.sum(dim=2).mean()
+        # loss = self._add_constraint_loss(loss)
         # Regularize.
         if self.reg_enabled:
             steps_per_epoch = math.ceil(self.trainer.estimated_stepping_batches / self.trainer.max_epochs)
@@ -807,6 +809,28 @@ class TimeNet(pl.LightningModule):
         else:
             reg_loss = torch.tensor(0.0, device=self.device)
         return loss, reg_loss
+
+    def _add_constraint_loss(self, loss):
+        """Add constraint loss to the loss function"""
+        constraint_loss = self.constraint_events(self.config_events)
+        loss += constraint_loss
+        return loss
+
+    def constraint_events(self, config_events):
+        events_loss = 0.0
+        if config_events is not None:
+            for event, configs in config_events.items():
+                if configs["constraint"] == "positive":
+                    events_loss += self._positive_constraint_weights(self.get_event_weights(event))
+                if configs["constraint"] == "negative":
+                    events_loss += self._negative_constraint_weights(self.get_event_weights(event))
+        return events_loss
+
+    def _positive_constraint_weights(self, weights):
+        loss = 0.0
+        for offset in weights.keys():
+            loss += torch.mean(torch.relu(weights[offset])).squeeze()
+        return loss
 
     def training_step(self, batch, batch_idx):
         inputs, targets, meta = batch
