@@ -260,10 +260,10 @@ class TimeNet(pl.LightningModule):
                     self.multiplicative_constraint_mask = self.set_constraint_mask(configs["constraint"], self.multiplicative_constraint_mask)
 
             expand_mask = torch.zeros(len(self.quantiles), len(self.additive_constraint_mask))
-            expand_mask[len(self.quantiles) // 2, :] = self.additive_constraint_mask
+            expand_mask[len(self.quantiles) // 2, :] = torch.tensor(self.additive_constraint_mask, dtype=torch.float32).view(-1, 1)
             self.additive_constraint_mask = expand_mask
             expand_mask = torch.zeros(len(self.quantiles), len(self.multiplicative_constraint_mask))
-            expand_mask[len(self.quantiles) // 2, :] = self.multiplicative_constraint_mask
+            expand_mask[len(self.quantiles) // 2, :] = torch.tensor(self.multiplicative_constraint_mask, dtype=torch.float32).view(-1, 1)
             self.multiplicative_constraint_mask = expand_mask
 
             self.event_params = nn.ParameterDict(
