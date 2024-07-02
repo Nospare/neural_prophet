@@ -477,6 +477,7 @@ class Regressor:
     reg_lambda: Optional[float]
     normalize: Union[str, bool]
     mode: str
+    constraint: str
 
 
 @dataclass
@@ -496,6 +497,7 @@ class Event:
     upper_window: int
     reg_lambda: Optional[float]
     mode: str
+    constraint: str
 
 
 ConfigEvents = OrderedDictType[str, Event]
